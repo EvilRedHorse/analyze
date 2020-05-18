@@ -3,7 +3,7 @@ package lockcheck_test
 import (
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia/analysis/lockcheck"
+	"gitlab.com/NebulousLabs/analysis/lockcheck"
 	"golang.org/x/tools/go/analysis/analysistest"
 )
 

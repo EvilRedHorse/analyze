@@ -109,4 +109,7 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+# Generated binary
+analysis
+
 # End of https://www.gitignore.io/api/vim,linux,macos,windows,visualstudiocode

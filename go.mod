@@ -1,4 +1,4 @@
-module gitlab.com/NebulousLabs/analysis
+module gitlab.com/NebulousLabs/analyze
 
 go 1.13
 

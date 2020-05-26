@@ -110,6 +110,6 @@ $RECYCLE.BIN/
 *.lnk
 
 # Generated binary
-analysis
+analyze
 
 # End of https://www.gitignore.io/api/vim,linux,macos,windows,visualstudiocode

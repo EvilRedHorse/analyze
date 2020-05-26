@@ -3,7 +3,7 @@ package jsontag_test
 import (
 	"testing"
 
-	"gitlab.com/NebulousLabs/analysis/jsontag"
+	"gitlab.com/NebulousLabs/analyze/jsontag"
 	"golang.org/x/tools/go/analysis/analysistest"
 )
 

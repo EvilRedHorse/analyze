@@ -1,9 +1,9 @@
 package main
 
 import (
-	"gitlab.com/NebulousLabs/analysis/jsontag"
-	"gitlab.com/NebulousLabs/analysis/lockcheck"
-	"gitlab.com/NebulousLabs/analysis/responsewritercheck"
+	"gitlab.com/NebulousLabs/analyze/jsontag"
+	"gitlab.com/NebulousLabs/analyze/lockcheck"
+	"gitlab.com/NebulousLabs/analyze/responsewritercheck"
 	"golang.org/x/tools/go/analysis/multichecker"
 )
 

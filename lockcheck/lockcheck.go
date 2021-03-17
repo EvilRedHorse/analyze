@@ -241,7 +241,7 @@ func checkLockSafety(pass *analysis.Pass, fd *ast.FuncDecl, recv, recvMu types.O
 				} else if managesOwnLocking(method) {
 					pass.Reportf(n.Pos(), "unprivileged method %s calls privileged method %s", name, method)
 				}
-			} else if field, ok := isFieldAccess(n); ok && !firstWordIs(field.Name, "static") && !lockHeld {
+			} else if field, ok := isFieldAccess(n); ok && !firstWordIs(field.Name, "static") && !firstWordIs(field.Name, "atomic") && !lockHeld {
 				// NOTE: a method call is also considered a field access, so
 				// it's important that we only examine field accesses that
 				// aren't method calls (on recv).

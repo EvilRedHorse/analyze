@@ -266,6 +266,8 @@ func checkLockSafety(pass *analysis.Pass, fd *ast.FuncDecl, recv, recvMu types.O
 // managesOwnLocking returns whether a method manages its own locking.
 func managesOwnLocking(name string) bool {
 	return isManagedExported(name) ||
+		firstWordIs(name, "atomic") ||
+		firstWordIs(name, "extern") ||
 		firstWordIs(name, "managed") ||
 		firstWordIs(name, "threaded") ||
 		firstWordIs(name, "call")

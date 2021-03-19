@@ -161,6 +161,12 @@ func (f *Foo) UnmanagedMethod() {
 	f.i++ // OK
 }
 
+func (f *Foo) UnmanagedMethodHoldLock() {
+	f.mu.Lock() // want "unprivileged method UnmanagedMethodHoldLock locks mutex"
+	f.i++
+	f.mu.Unlock()
+}
+
 func (f *Foo) externMethodBad() {
 	f.externI++ // want "privileged method externMethodBad accesses externI without holding mutex"
 }
@@ -185,12 +191,30 @@ func (f *Foo) managedAtomic() {
 	f.atomicI++ // OK
 }
 
+func (f *Foo) managedAtomicWithLock() {
+	f.mu.Lock()
+	f.atomicI++ // OK
+	f.mu.Unlock()
+}
+
 func (f *Foo) atomicMethod() {
 	f.atomicI++ // OK
 }
 
+func (f *Foo) atomicMethodWithLock() {
+	f.mu.Lock()
+	f.atomicI++ // OK
+	f.mu.Unlock()
+}
+
 func (f *Foo) callAtmoicMethod() {
 	f.atomicMethod() // OK
+}
+
+func (f *Foo) callAtmoicMethodWithLock() {
+	f.mu.Lock()
+	f.atomicMethod() // want "privileged method callAtmoicMethodWithLock calls privileged method atomicMethod while holding mutex"
+	f.mu.Unlock()
 }
 
 type FooNoMutex struct {

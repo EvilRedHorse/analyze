@@ -3,8 +3,10 @@ package a
 import "sync"
 
 type Foo struct {
-	i  int
-	mu sync.Mutex
+	i       int
+	atomicI int
+	externI int
+	mu      sync.Mutex
 }
 
 func (f *Foo) bar() {
@@ -153,6 +155,42 @@ func (f *Foo) CallAssignedLiteral() {
 		f.mu.Unlock()
 	}
 	fn()
+}
+
+func (f *Foo) UnmanagedMethod() {
+	f.i++ // OK
+}
+
+func (f *Foo) externMethodBad() {
+	f.externI++ // want "privileged method externMethodBad accesses externI without holding mutex"
+}
+
+func (f *Foo) externMethod() {
+	f.mu.Lock()
+	f.externI++ // OK
+	f.mu.Unlock()
+}
+
+func (f *Foo) managedCallExtern() {
+	f.externMethod() // OK
+}
+
+func (f *Foo) managedCallExternBad() {
+	f.mu.Lock()
+	f.externMethod() // want "privileged method managedCallExternBad calls privileged method externMethod while holding mutex"
+	f.mu.Unlock()
+}
+
+func (f *Foo) managedAtomic() {
+	f.atomicI++ // OK
+}
+
+func (f *Foo) atomicMethod() {
+	f.atomicI++ // OK
+}
+
+func (f *Foo) callAtmoicMethod() {
+	f.atomicMethod() // OK
 }
 
 type FooNoMutex struct {

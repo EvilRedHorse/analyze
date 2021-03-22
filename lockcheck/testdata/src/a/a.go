@@ -3,8 +3,10 @@ package a
 import "sync"
 
 type Foo struct {
-	i  int
-	mu sync.Mutex
+	i       int
+	atomicI int
+	externI int
+	mu      sync.Mutex
 }
 
 func (f *Foo) bar() {
@@ -153,6 +155,66 @@ func (f *Foo) CallAssignedLiteral() {
 		f.mu.Unlock()
 	}
 	fn()
+}
+
+func (f *Foo) UnmanagedMethod() {
+	f.i++ // OK
+}
+
+func (f *Foo) UnmanagedMethodHoldLock() {
+	f.mu.Lock() // want "unprivileged method UnmanagedMethodHoldLock locks mutex"
+	f.i++
+	f.mu.Unlock()
+}
+
+func (f *Foo) externMethodBad() {
+	f.externI++ // want "privileged method externMethodBad accesses externI without holding mutex"
+}
+
+func (f *Foo) externMethod() {
+	f.mu.Lock()
+	f.externI++ // OK
+	f.mu.Unlock()
+}
+
+func (f *Foo) managedCallExtern() {
+	f.externMethod() // OK
+}
+
+func (f *Foo) managedCallExternBad() {
+	f.mu.Lock()
+	f.externMethod() // want "privileged method managedCallExternBad calls privileged method externMethod while holding mutex"
+	f.mu.Unlock()
+}
+
+func (f *Foo) managedAtomic() {
+	f.atomicI++ // OK
+}
+
+func (f *Foo) managedAtomicWithLock() {
+	f.mu.Lock()
+	f.atomicI++ // OK
+	f.mu.Unlock()
+}
+
+func (f *Foo) atomicMethod() {
+	f.atomicI++ // OK
+}
+
+func (f *Foo) atomicMethodWithLock() {
+	f.mu.Lock()
+	f.atomicI++ // OK
+	f.mu.Unlock()
+}
+
+func (f *Foo) callAtomicMethod() {
+	f.atomicMethod() // OK
+}
+
+func (f *Foo) callAtomicMethodWithLock() {
+	f.mu.Lock()
+	f.atomicMethod() // want "privileged method callAtomicMethodWithLock calls privileged method atomicMethod while holding mutex"
+	f.mu.Unlock()
 }
 
 type FooNoMutex struct {

@@ -1,0 +1,8 @@
+image: golang:1.15
+
+test:
+  script:
+   - make fmt
+   - make vet
+   - make test
+   - make test-long

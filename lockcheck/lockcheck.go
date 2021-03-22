@@ -24,74 +24,6 @@ var Analyzer = &analysis.Analyzer{
 	},
 }
 
-// run implements the analysis interface
-func run(pass *analysis.Pass) (interface{}, error) {
-	inspect := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-
-	nodeFilter := []ast.Node{
-		(*ast.FuncDecl)(nil),
-	}
-
-	inspect.Preorder(nodeFilter, func(n ast.Node) {
-		fd := n.(*ast.FuncDecl)
-		if fd.Recv == nil {
-			return // not a method
-		}
-		// if there's no receiver list (e.g. func (Foo) bar()), skip this method, since it obviously
-		// can't access a mutex or any other methods
-		if len(fd.Recv.List) == 0 || len(fd.Recv.List[0].Names) == 0 {
-			return
-		}
-		recv := pass.TypesInfo.Defs[fd.Recv.List[0].Names[0]]
-		mu, ok := containsMutex(pass, recv)
-		if !ok {
-			return
-		}
-		checkLockSafety(pass, fd, recv, mu)
-	})
-	return nil, nil
-}
-
-// isSyncObject is a helper to determing if the object is a sync package object
-//
-// We check for golang's sync packages as well as NebulousLabs TryMutex and
-// ThreadGroup packages
-func isSyncObject(t types.Type) bool {
-	switch t.String() {
-	case "sync.Mutex",
-		"sync.RWMutex",
-		"sync.WaitGroup",
-		"gitlab.com/NebulousLabs/Sia/sync.TryMutex",
-		"gitlab.com/NebulousLabs/threadgroup.ThreadGroup":
-		return true
-	}
-	return false
-}
-
-// isMutexType is a helper for determining if the object type is a mutex
-func isMutexType(t types.Type) bool {
-	// The type is a mutex type if it has a `Mutex` suffix
-	return strings.HasSuffix(t.String(), "Mutex")
-}
-
-// containsMutex is a helper that checks if an object contains a mutex
-func containsMutex(pass *analysis.Pass, recv types.Object) (types.Object, bool) {
-	// Grab the underlying Type Object??
-	if p, ok := recv.Type().Underlying().(*types.Pointer); ok {
-		// Crab the struct of the pointer's underlying element
-		if s, ok := p.Elem().Underlying().(*types.Struct); ok {
-			// Iterate over the struct's fields
-			for i := 0; i < s.NumFields(); i++ {
-				// Check if the field is a Mutex Type and the name is `mu`
-				if f := s.Field(i); isMutexType(f.Type()) && s.Field(i).Name() == "mu" {
-					return s.Field(i), true
-				}
-			}
-		}
-	}
-	return nil, false
-}
-
 // checkLockSafety is the main logic function for lockcheck
 func checkLockSafety(pass *analysis.Pass, fd *ast.FuncDecl, recv, recvMu types.Object) {
 	name := fd.Name.String()
@@ -282,6 +214,82 @@ func checkLockSafety(pass *analysis.Pass, fd *ast.FuncDecl, recv, recvMu types.O
 	checkPath(cfgs.FuncDecl(fd).Blocks[0], false)
 }
 
+// containsMutex is a helper that checks if an object contains a mutex
+func containsMutex(pass *analysis.Pass, recv types.Object) (types.Object, bool) {
+	// Grab the underlying Type Object??
+	if p, ok := recv.Type().Underlying().(*types.Pointer); ok {
+		// Crab the struct of the pointer's underlying element
+		if s, ok := p.Elem().Underlying().(*types.Struct); ok {
+			// Iterate over the struct's fields
+			for i := 0; i < s.NumFields(); i++ {
+				// Check if the field is a Mutex Type and the name is `mu`
+				if f := s.Field(i); isMutexType(f.Type()) && s.Field(i).Name() == "mu" {
+					return s.Field(i), true
+				}
+			}
+		}
+	}
+	return nil, false
+}
+
+// firstWordIs returns true if name begins with prefix, followed by an uppercase
+// letter. For example, firstWordIs("startsUpper", "starts") == true, but
+// firstWordIs("starts", "starts") == false.
+func firstWordIs(name, prefix string) bool {
+	if !strings.HasPrefix(name, prefix) {
+		return false
+	}
+	suffix := strings.TrimPrefix(name, prefix)
+	return len(suffix) > 0 && ast.IsExported(suffix)
+}
+
+// isManagedExported returns whether or not a method is a managed exported
+// method
+func isManagedExported(name string) bool {
+	return ast.IsExported(name) && !firstWordIs(name, "Unmanaged")
+}
+
+// isMutexCall is a helper that checks for a mutex call
+func isMutexCall(pass *analysis.Pass, recvMu types.Object, n ast.Node, muStr string) bool {
+	// Check if the Node is an expression followed by an argument list.
+	if ce, ok := n.(*ast.CallExpr); ok {
+		// Check if the Node is an expression followed by a selector.
+		if fnse, ok := ce.Fun.(*ast.SelectorExpr); ok {
+			// Check if the selector has the expected suffix.
+			if strings.HasSuffix(fnse.Sel.Name, muStr) {
+				if se, ok := fnse.X.(*ast.SelectorExpr); ok {
+					if sel, ok := pass.TypesInfo.Selections[se]; ok && sel.Obj() == recvMu {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+// isMutexType is a helper for determining if the object type is a mutex
+func isMutexType(t types.Type) bool {
+	// The type is a mutex type if it has a `Mutex` suffix
+	return strings.HasSuffix(t.String(), "Mutex")
+}
+
+// isSyncObject is a helper to determing if the object is a sync package object
+//
+// We check for golang's sync packages as well as NebulousLabs TryMutex and
+// ThreadGroup packages
+func isSyncObject(t types.Type) bool {
+	switch t.String() {
+	case "sync.Mutex",
+		"sync.RWMutex",
+		"sync.WaitGroup",
+		"gitlab.com/NebulousLabs/Sia/sync.TryMutex",
+		"gitlab.com/NebulousLabs/threadgroup.ThreadGroup":
+		return true
+	}
+	return false
+}
+
 // managesOwnLocking returns whether a method manages its own locking.
 //
 // atomic methods use sync.Atomic to be thread safe and don't require a mutex
@@ -299,35 +307,30 @@ func managesOwnLocking(name string) bool {
 		firstWordIs(name, "call")
 }
 
-// isManagedExported returns whether or not a method is a managed exported
-// method
-func isManagedExported(name string) bool {
-	return ast.IsExported(name) && !firstWordIs(name, "Unmanaged")
-}
+// run implements the analysis interface
+func run(pass *analysis.Pass) (interface{}, error) {
+	inspect := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 
-// firstWordIs returns true if name begins with prefix, followed by an uppercase
-// letter. For example, firstWordIs("startsUpper", "starts") == true, but
-// firstWordIs("starts", "starts") == false.
-func firstWordIs(name, prefix string) bool {
-	if !strings.HasPrefix(name, prefix) {
-		return false
+	nodeFilter := []ast.Node{
+		(*ast.FuncDecl)(nil),
 	}
-	suffix := strings.TrimPrefix(name, prefix)
-	return len(suffix) > 0 && ast.IsExported(suffix)
-}
 
-// isMutexCall is a helper that checks for a mutex call
-func isMutexCall(pass *analysis.Pass, recvMu types.Object, n ast.Node, muStr string) bool {
-	if ce, ok := n.(*ast.CallExpr); ok {
-		if fnse, ok := ce.Fun.(*ast.SelectorExpr); ok {
-			if strings.HasSuffix(fnse.Sel.Name, muStr) {
-				if se, ok := fnse.X.(*ast.SelectorExpr); ok {
-					if sel, ok := pass.TypesInfo.Selections[se]; ok && sel.Obj() == recvMu {
-						return true
-					}
-				}
-			}
+	inspect.Preorder(nodeFilter, func(n ast.Node) {
+		fd := n.(*ast.FuncDecl)
+		if fd.Recv == nil {
+			return // not a method
 		}
-	}
-	return false
+		// if there's no receiver list (e.g. func (Foo) bar()), skip this method, since it obviously
+		// can't access a mutex or any other methods
+		if len(fd.Recv.List) == 0 || len(fd.Recv.List[0].Names) == 0 {
+			return
+		}
+		recv := pass.TypesInfo.Defs[fd.Recv.List[0].Names[0]]
+		mu, ok := containsMutex(pass, recv)
+		if !ok {
+			return
+		}
+		checkLockSafety(pass, fd, recv, mu)
+	})
+	return nil, nil
 }

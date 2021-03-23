@@ -189,9 +189,9 @@ func checkLockSafety(pass *analysis.Pass, fd *ast.FuncDecl, recv, recvMu types.O
 					// calling a managed method.
 					pass.Reportf(n.Pos(), "unprivileged method %s calls privileged method %s", name, method)
 				}
-			} else if field, ok := isFieldAccess(n); ok && !firstWordIs(field.Name, "static") && !firstWordIs(field.Name, "atomic") && !lockHeld {
-				// Struct field access found that is not static of atomic while no lock
-				// is being held
+			} else if field, ok := isFieldAccess(n); ok && !isStaticField(field.Name) && !lockHeld {
+				// Struct field access found that should be managed by a mutex while no
+				// lock is being held
 				//
 				// NOTE: a method call is also considered a field access, so
 				// it's important that we only examine field accesses that
@@ -274,6 +274,12 @@ func isMutexType(t types.Type) bool {
 	return strings.HasSuffix(t.String(), "Mutex")
 }
 
+// isStaticField returns true if the field can be treated as static and doesn't
+// need to be managed under a mutex
+func isStaticField(name string) bool {
+	return firstWordIs(name, "static") || firstWordIs(name, "atomic")
+}
+
 // isSyncObject is a helper to determing if the object is a sync package object
 //
 // We check for golang's sync packages as well as NebulousLabs TryMutex and
@@ -300,7 +306,6 @@ func isSyncObject(t types.Type) bool {
 //   - threaded is an asynchronous method
 func managesOwnLocking(name string) bool {
 	return isManagedExported(name) ||
-		firstWordIs(name, "atomic") ||
 		firstWordIs(name, "extern") ||
 		firstWordIs(name, "managed") ||
 		firstWordIs(name, "threaded") ||

@@ -1,6 +1,8 @@
 package lockcheck
 
 import (
+	"go/types"
+
 	"testing"
 )
 
@@ -10,6 +12,7 @@ func TestLockcheckHelpers(t *testing.T) {
 	t.Run("FirstWordIs", testFirstWordIs)
 	t.Run("IsManagedExported", testIsManagedExported)
 	t.Run("IsMutexCall", testIsMutexCall)
+	t.Run("IsMutexType", testIsMutexType)
 	t.Run("IsStaticField", testIsStaticField)
 	t.Run("IsSyncObject", testIsSyncObject)
 	t.Run("ManagesOwnLocking", testManagesOwnLocking)
@@ -64,6 +67,24 @@ func testIsMutexCall(t *testing.T) {
 	t.Skip("not implemented")
 }
 
+// testIsMutexType probes the isMutexType function
+func testIsMutexType(t *testing.T) {
+	var foo fooType
+	if isMutexType(foo.Underlying()) {
+		t.Error("bad")
+	}
+
+	var fooMu fooMutex
+	if !isMutexType(fooMu.Underlying()) {
+		t.Error("bad")
+	}
+
+	var fooMuNot fooMutexNot
+	if isMutexType(fooMuNot.Underlying()) {
+		t.Error("bad")
+	}
+}
+
 // testIsStaticField probes the isStaticField function
 func testIsStaticField(t *testing.T) {
 	// Define tests
@@ -86,8 +107,46 @@ func testIsStaticField(t *testing.T) {
 	}
 }
 
+// testIsSyncObject probes the isSyncObject function
 func testIsSyncObject(t *testing.T) {
-	t.Skip("not implemented")
+	// Define variable types to test
+	var mu syncMutex
+	var rwMu syncRWMutex
+	var wg syncWaitGroup
+	var siaRW siaSyncRWMutex
+	var siaTry siaSyncTryMutex
+	var siaTryRW siaSyncTryRWMutex
+	var tg threadgroup
+
+	var foo fooType
+	var fooMu fooMutex
+	var fooMuNot fooMutexNot
+
+	// Define tests
+	var tests = []struct {
+		object string
+		t      types.Type
+		result bool
+	}{
+		{mu.String(), mu.Underlying(), true},
+		{rwMu.String(), rwMu.Underlying(), true},
+		{wg.String(), wg.Underlying(), true},
+		{siaRW.String(), siaRW.Underlying(), true},
+		{siaTry.String(), siaTry.Underlying(), true},
+		{siaTryRW.String(), siaTryRW.Underlying(), true},
+		{tg.String(), tg.Underlying(), true},
+
+		{foo.String(), foo.Underlying(), false},
+		{fooMu.String(), fooMu.Underlying(), false},
+		{fooMuNot.String(), fooMuNot.Underlying(), false},
+	}
+
+	// Run Tests
+	for _, test := range tests {
+		if isSyncObject(test.t) != test.result {
+			t.Error("bad", test.object)
+		}
+	}
 }
 
 // testManagesOwnLocking probes the managesOwnLocking function

@@ -215,8 +215,8 @@ func checkLockSafety(pass *analysis.Pass, fd *ast.FuncDecl, recv, recvMu types.O
 }
 
 // containsMutex is a helper that checks if an object contains a mutex
-func containsMutex(pass *analysis.Pass, recv types.Object) (types.Object, bool) {
-	// Grab the underlying Type Object??
+func containsMutex(recv types.Object) (types.Object, bool) {
+	// Grab the pointer of the objects underlying type
 	if p, ok := recv.Type().Underlying().(*types.Pointer); ok {
 		// Crab the struct of the pointer's underlying element
 		if s, ok := p.Elem().Underlying().(*types.Struct); ok {
@@ -289,7 +289,9 @@ func isSyncObject(t types.Type) bool {
 	case "sync.Mutex",
 		"sync.RWMutex",
 		"sync.WaitGroup",
+		"gitlab.com/NebulousLabs/Sia/sync.RWMutex",
 		"gitlab.com/NebulousLabs/Sia/sync.TryMutex",
+		"gitlab.com/NebulousLabs/Sia/sync.TryRWMutex",
 		"gitlab.com/NebulousLabs/threadgroup.ThreadGroup":
 		return true
 	}
@@ -331,7 +333,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 			return
 		}
 		recv := pass.TypesInfo.Defs[fd.Recv.List[0].Names[0]]
-		mu, ok := containsMutex(pass, recv)
+		mu, ok := containsMutex(recv)
 		if !ok {
 			return
 		}

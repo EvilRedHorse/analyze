@@ -19,6 +19,7 @@ func TestLockcheckHelpers(t *testing.T) {
 }
 
 func testContainsMutex(t *testing.T) {
+	// Need to figure out how to satisfy the types.Object interface
 	t.Skip("not implemented")
 }
 
@@ -29,7 +30,10 @@ func testFirstWordIs(t *testing.T) {
 		prefix string
 		result bool
 	}{
+		// Valid cases
 		{"startsUpper", "starts", true},
+
+		// Invalid cases
 		{"startsupper", "starts", false},
 		{"starts", "starts", false},
 	}
@@ -48,9 +52,12 @@ func testIsManagedExported(t *testing.T) {
 		name   string
 		result bool
 	}{
-		{"unexported", false},
+		// Valid cases
 		{"Exported", true},
 		{"OtherExported", true},
+
+		// Invalid cases
+		{"unexported", false},
 		{"UnmanagedExported", false},
 		{"unmanagedUnExported", false},
 	}
@@ -64,6 +71,7 @@ func testIsManagedExported(t *testing.T) {
 }
 
 func testIsMutexCall(t *testing.T) {
+	// Need to figure out how to satisfy the types.Object interface
 	t.Skip("not implemented")
 }
 
@@ -92,11 +100,16 @@ func testIsStaticField(t *testing.T) {
 		name   string
 		result bool
 	}{
-		{"field", false},
+		// Valid cases
 		{"staticField", true},
 		{"atomicField", true},
+
+		// Invalid cases
+		{"externField", false},
+		{"field", false},
 		{"notStaticField", false},
 		{"notAtomicField", false},
+		{"noExternField", false},
 	}
 
 	// Run tests
@@ -128,6 +141,7 @@ func testIsSyncObject(t *testing.T) {
 		t      types.Type
 		result bool
 	}{
+		// Valid cases
 		{mu.String(), mu.Underlying(), true},
 		{rwMu.String(), rwMu.Underlying(), true},
 		{wg.String(), wg.Underlying(), true},
@@ -136,6 +150,7 @@ func testIsSyncObject(t *testing.T) {
 		{siaTryRW.String(), siaTryRW.Underlying(), true},
 		{tg.String(), tg.Underlying(), true},
 
+		// Invalid cases
 		{foo.String(), foo.Underlying(), false},
 		{fooMu.String(), fooMu.Underlying(), false},
 		{fooMuNot.String(), fooMuNot.Underlying(), false},
@@ -156,16 +171,19 @@ func testManagesOwnLocking(t *testing.T) {
 		name   string
 		result bool
 	}{
-		{"unexported", false},
+		// Valid cases
 		{"Exported", true},
 		{"OtherExported", true},
-		{"UnmanagedExported", false},
-		{"unmanagedUnExported", false},
 		{"managedMethod", true},
 		{"externMethod", true},
-		{"atomicMethod", false}, // Our guidelines don't talk about atomic prefix for methods
 		{"threadedMethod", true},
 		{"callMethod", true},
+
+		// Invalid cases
+		{"unexported", false},
+		{"UnmanagedExported", false},
+		{"unmanagedUnExported", false},
+		{"atomicMethod", false}, // Our guidelines don't talk about atomic prefix for methods
 	}
 
 	// Run tests

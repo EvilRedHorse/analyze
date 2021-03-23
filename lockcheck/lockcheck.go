@@ -300,7 +300,6 @@ func isSyncObject(t types.Type) bool {
 
 // managesOwnLocking returns whether a method manages its own locking.
 //
-// atomic methods use sync.Atomic to be thread safe and don't require a mutex
 // extern methods are handled by a mutex external to the struct's primary mutex
 // managed, call, and threaded all handle the structs mutex
 //   - managed is a synchronous method within a subsystem

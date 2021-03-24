@@ -217,18 +217,24 @@ func checkLockSafety(pass *analysis.Pass, fd *ast.FuncDecl, recv, recvMu types.O
 // containsMutex is a helper that checks if an object contains a mutex
 func containsMutex(recv types.Object) (types.Object, bool) {
 	// Grab the pointer of the objects underlying type
-	if p, ok := recv.Type().Underlying().(*types.Pointer); ok {
-		// Crab the struct of the pointer's underlying element
-		if s, ok := p.Elem().Underlying().(*types.Struct); ok {
-			// Iterate over the struct's fields
-			for i := 0; i < s.NumFields(); i++ {
-				// Check if the field is a Mutex Type and the name is `mu`
-				if f := s.Field(i); isMutexType(f.Type()) && s.Field(i).Name() == "mu" {
-					return s.Field(i), true
-				}
-			}
+	p, ok := recv.Type().Underlying().(*types.Pointer)
+	if !ok {
+		return nil, false
+	}
+	// Crab the struct of the pointer's underlying element
+	s, ok := p.Elem().Underlying().(*types.Struct)
+	if !ok {
+		return nil, false
+	}
+	// Iterate over the struct's fields
+	for i := 0; i < s.NumFields(); i++ {
+		// Check if the field is a Mutex Type and the name is `mu`
+		f := s.Field(i)
+		if isMutexType(f.Type()) && f.Name() == "mu" {
+			return f, true
 		}
 	}
+
 	return nil, false
 }
 
@@ -252,18 +258,32 @@ func isManagedExported(name string) bool {
 // isMutexCall is a helper that checks for a mutex call
 func isMutexCall(pass *analysis.Pass, recvMu types.Object, n ast.Node, muStr string) bool {
 	// Check if the Node is an expression followed by an argument list.
-	if ce, ok := n.(*ast.CallExpr); ok {
-		// Check if the Node is an expression followed by a selector.
-		if fnse, ok := ce.Fun.(*ast.SelectorExpr); ok {
-			// Check if the selector has the expected suffix.
-			if strings.HasSuffix(fnse.Sel.Name, muStr) {
-				if se, ok := fnse.X.(*ast.SelectorExpr); ok {
-					if sel, ok := pass.TypesInfo.Selections[se]; ok && sel.Obj() == recvMu {
-						return true
-					}
-				}
-			}
-		}
+	ce, ok := n.(*ast.CallExpr)
+	if !ok {
+		return false
+	}
+
+	// Check if the Node is an expression followed by a selector.
+	fnse, ok := ce.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+
+	// Check if the selector has the expected suffix.
+	if !strings.HasSuffix(fnse.Sel.Name, muStr) {
+		return false
+	}
+
+	// Check if the expression is followed by a selector.
+	se, ok := fnse.X.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+
+	// Check if the selector is the mutex.
+	sel, ok := pass.TypesInfo.Selections[se]
+	if ok && sel.Obj() == recvMu {
+		return true
 	}
 	return false
 }

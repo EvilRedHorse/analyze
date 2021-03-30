@@ -202,18 +202,18 @@ func (f *Foo) atomicMethod() {
 }
 
 func (f *Foo) atomicMethodWithLock() {
-	f.mu.Lock()
-	f.atomicI++ // OK
+	f.mu.Lock() // want "unprivileged method atomicMethodWithLock locks mutex"
+	f.atomicI++
 	f.mu.Unlock()
 }
 
 func (f *Foo) callAtomicMethod() {
-	f.atomicMethod() // OK
+	f.atomicMethod() // want "privileged method callAtomicMethod calls unprivileged method atomicMethod without holding mutex"
 }
 
 func (f *Foo) callAtomicMethodWithLock() {
 	f.mu.Lock()
-	f.atomicMethod() // want "privileged method callAtomicMethodWithLock calls privileged method atomicMethod while holding mutex"
+	f.atomicMethod() // OK
 	f.mu.Unlock()
 }
 

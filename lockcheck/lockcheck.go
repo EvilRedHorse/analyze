@@ -313,6 +313,9 @@ func isSyncObject(t types.Type) bool {
 		"gitlab.com/NebulousLabs/Sia/sync.TryMutex",
 		"gitlab.com/NebulousLabs/Sia/sync.TryRWMutex",
 		"gitlab.com/NebulousLabs/threadgroup.ThreadGroup":
+		"go.sia.tech/siad/sync.RWMutex",
+		"go.sia.tech/siad/sync.TryMutex",
+		"go.sia.tech/siad/sync.TryRWMutex",
 		return true
 	}
 	return false
